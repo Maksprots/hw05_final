@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    {% extends 'base.html' %}
+    <meta charset="UTF-8">
+</head>
+<body>
+{% block content %}
+<div class="container">
+    <title>Подписки</title>
+    <br>
+    <h1>Подписки</h1>
+    {% include 'includes/switcher.html' %}
+    {% for post in page_obj %}
+    {% include 'includes/post.html' %}
+    {% if post.group %}
+    <a href="{% url 'posts:group_list' post.group.slug %}">все записи группы</a>
+    {% endif %}
+    {% if not forloop.last %}
+    <hr>
+    {% endif %}
+    {% endfor %}
+    {% include 'includes/paginator.html' %}
+    {% endblock %}
+</div>
+</body>
+</html>
