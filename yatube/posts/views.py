@@ -68,7 +68,7 @@ def post_create(request):
     }
     if request.method == 'POST':
         form = PostForm(request.POST or None,
-                        request.FILES or None)
+                        request.FILES)
         if form.is_valid():
             post = form.save(commit=False)
             post.author = request.user
@@ -123,21 +123,16 @@ def follow_index(request):
 
 @login_required
 def profile_follow(request, username):
-    if request.user.username == username:
-        return redirect('posts:profile', username=username)
-    following = get_object_or_404(User, username=username)
-    already_follows = Follow.objects.filter(
-        user=request.user,
-        author=following
-    ).exists()
-    if not already_follows:
-        Follow.objects.create(user=request.user, author=following)
+    if request.user.username != username:
+        following = get_object_or_404(User, username=username)
+        Follow.objects.get_or_create(user=request.user,
+                                     author=following)
     return redirect('posts:profile', username=username)
 
 
 @login_required
 def profile_unfollow(request, username):
-    following = get_object_or_404(User, username=username)
+    following = User.objects.get(username=username)
     follower = get_object_or_404(Follow,
                                  author=following,
                                  user=request.user)

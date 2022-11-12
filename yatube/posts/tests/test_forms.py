@@ -4,13 +4,13 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 import shutil
 import tempfile
-from ..forms import PostForm
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 User = get_user_model()
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
+TEXT_COMMENT = 'test comment'
 
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
@@ -29,7 +29,6 @@ class PostCreateFormTests(TestCase):
             post=cls.post,
             text='test comment'
         )
-        cls.form = PostForm()
 
     def setUp(self):
         self.authorised_client = Client()
@@ -75,6 +74,26 @@ class PostCreateFormTests(TestCase):
         )
         self.assertEqual(Post.objects.count(), posts_count + 1)
 
+    def test_uncorrect_create_post(self):
+        uploaded = SimpleUploadedFile(
+            name='small.txt',
+            content=b'\x00\x00\x00\x2C\x00\x00\x00\x00',
+        )
+        form_data = {
+            'text': 'тестовый пост',
+            'image': uploaded,
+        }
+        response = self.authorised_client.post(
+            reverse('posts:post_create'),
+            data=form_data,
+            follow=True
+        )
+        self.assertFormError(response,
+                             form='form',
+                             field='image',
+                             errors=[]
+                             )
+
     def test_correct_edit_post(self):
         form_data = {
             'text': 'тестовый посt',
@@ -90,8 +109,13 @@ class PostCreateFormTests(TestCase):
         self.assertEqual(post_old_image, post_new.image)
 
     def test_display_comment_on_the_page(self):
-        response = self.authorised_client.get(
-            reverse('posts:post_detail',
-                    kwargs={'post_id': self.post.id}))
-        comment = response.context['comments'][0].text
-        self.assertEqual(comment, 'test comment')
+        form_data = {
+            'text': TEXT_COMMENT
+        }
+        self.authorised_client.post(
+            reverse('posts:add_comment',
+                    kwargs={'post_id': self.post.id}),
+            data=form_data)
+        self.assertTrue(
+            Comment.objects.filter(
+                text=TEXT_COMMENT))

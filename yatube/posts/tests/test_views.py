@@ -8,6 +8,15 @@ from django.core.cache import cache
 User = get_user_model()
 
 TEXT_TEST = 'тестовый пост'
+TEXT_COMMENT = 'text comment'
+USER_NO_NAME = 'NoName'
+AUTHOR2 = 'author2'
+USER_FOLLOWER = 'user_follower'
+TITLE = 'Заголовок тестовой группы'
+SLUG = 'test_slug'
+SLUG_2 = 'test_slug2'
+DESCRIPTION = 'Тестовое описание'
+PAGE_OBJ = 'page_obj'
 
 
 class PostPagesTest(TestCase):
@@ -15,23 +24,23 @@ class PostPagesTest(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         # юзер 1 автор постов
-        cls.user = User.objects.create_user(username='NoName')
+        cls.user = User.objects.create_user(username=USER_NO_NAME)
         # юзер 2 автор постов
-        cls.user_2 = User.objects.create_user(username='author2')
+        cls.user_2 = User.objects.create_user(username=AUTHOR2)
         # юзер подписан на автора
-        cls.user_follower = User.objects.create_user(username='user_follower')
+        cls.user_follower = User.objects.create_user(username=USER_FOLLOWER)
         cls.group = Group.objects.create(
-            title='Заголовок тестовой группы',
-            slug='test_slug',
-            description='Тестовое описание',
+            title=TITLE,
+            slug=SLUG,
+            description=DESCRIPTION,
         )
         cls.another_group = Group.objects.create(
-            title='Заголовок тестовой группы',
-            slug='test_slug2',
-            description='Тестовое описание',
+            title=TITLE,
+            slug=SLUG_2,
+            description=DESCRIPTION,
         )
         cls.post = Post.objects.create(
-            text='тестовый пост',
+            text=TEXT_TEST,
             author=cls.user,
             group=cls.group,
         )
@@ -47,7 +56,7 @@ class PostPagesTest(TestCase):
 
         for i in range(13):
             cls.posts = Post.objects.create(
-                text='тестовый пост',
+                text=TEXT_TEST,
                 author=cls.user,
                 group=cls.group,
             )
@@ -66,10 +75,10 @@ class PostPagesTest(TestCase):
             reverse('posts:index'):
                 'posts/index.html',
             reverse('posts:group_list',
-                    kwargs={'slug': 'test_slug'}):
+                    kwargs={'slug': SLUG}):
                 'posts/group_list.html',
             reverse('posts:profile',
-                    kwargs={'username': 'NoName'}):
+                    kwargs={'username': USER_NO_NAME}):
                 'posts/profile.html',
             reverse('posts:post_detail',
                     kwargs={'post_id': self.post.id}):
@@ -93,57 +102,62 @@ class PostPagesTest(TestCase):
                 self.assertTemplateUsed(response, template)
 
     def post_test(self, response):
-        first_object = response.context['page_obj'][0]
+        first_object = response.context[PAGE_OBJ][0]
         post_text = first_object.text
         post_author = first_object.author
         post_group = first_object.group
-        self.assertEqual(post_text, 'тестовый пост')
+        self.assertEqual(post_text, TEXT_TEST)
         self.assertEqual(post_author, self.user)
         self.assertEqual(post_group, self.group)
 
+    def test_paginator(self):
+        cache.clear()
+        template_paginator_first_page = {
+            '/': 10,
+            f'/group/{SLUG}/': 10,
+            f'/profile/{USER_NO_NAME}/': 10,
+        }
+        for name, count in template_paginator_first_page.items():
+            with self.subTest(reverse_name=name):
+                response_ = self.authorised_client.get(name)
+                self.assertEqual(len(response_.context[PAGE_OBJ]), count)
+        cache.clear()
+        template_paginator_second_page = {
+            '/?page=2': 4,
+            f'/group/{SLUG}/?page=2': 4,
+            f'/profile/{USER_NO_NAME}/?page=2': 4,
+        }
+        for name, count in template_paginator_second_page.items():
+            with self.subTest(reverse_name=name):
+                response_ = self.authorised_client.get(name)
+                self.assertEqual(len(response_.context[PAGE_OBJ]), count)
+
     def test_correct_context_index(self):
-        # cache.clear()
         response = self.authorised_client.get(reverse('posts:index'))
         self.post_test(response)
-        self.assertEqual(len(response.context['page_obj']), 10)
-
-    def test_second_page_index(self):
-        # cache.clear()
-        response = self.client.get(reverse('posts:index') + '?page=2')
-        self.assertEqual(len(response.context['page_obj']), 4)
 
     def test_correct_context_group_list(self):
         cache.clear()
         response = self.authorised_client.get(
             reverse('posts:group_list',
-                    kwargs={'slug': 'test_slug'}))
+                    kwargs={'slug': SLUG}))
         self.post_test(response)
         group_obj = response.context['group']
         self.assertEqual(group_obj, self.group)
-        self.assertEqual(len(response.context['page_obj']), 10)
 
     def test_second_page_group_list(self):
-
         response = self.client.get(
             reverse('posts:group_list',
-                    kwargs={'slug': 'test_slug'}) + '?page=2')
-        self.assertEqual(len(response.context['page_obj']), 4)
+                    kwargs={'slug': SLUG}) + '?page=2')
+        self.assertEqual(len(response.context[PAGE_OBJ]), 4)
 
     def test_correct_context_profile(self):
-        # cache.clear()
         response = self.authorised_client.get(
             reverse('posts:profile',
-                    kwargs={'username': 'NoName'}))
+                    kwargs={'username': USER_NO_NAME}))
         self.post_test(response)
         author_obj = response.context['author']
         self.assertEqual(author_obj, self.user)
-        self.assertEqual(len(response.context['page_obj']), 10)
-
-    def test_second_page_profile(self):
-        response = self.client.get(
-            reverse('posts:profile',
-                    kwargs={'username': 'NoName'}) + '?page=2')
-        self.assertEqual(len(response.context['page_obj']), 4)
 
     def test_correct_context_post_detail(self):
         response = self.authorised_client.get(
@@ -187,8 +201,8 @@ class PostPagesTest(TestCase):
     def test_correct_group_of_post(self):
         response = self.authorised_client.get(
             reverse('posts:group_list',
-                    kwargs={'slug': 'test_slug2'}))
-        group_obj = response.context['page_obj']
+                    kwargs={'slug': SLUG_2}))
+        group_obj = response.context[PAGE_OBJ]
         self.assertNotIn(self.post, group_obj)
 
     def test_add_comment_no_auth(self):
@@ -196,14 +210,14 @@ class PostPagesTest(TestCase):
             reverse('posts:add_comment',
                     kwargs={'post_id': self.post.pk})
         )
-        template = '/auth/login/?next=/posts/1/comment/'
+        template = f'/auth/login/?next=/posts/{self.post.id}/comment/'
         self.assertRedirects(response, template)
 
     def test_cache(self):
         response1 = self.guest_client.get(
             reverse('posts:index')).content
         Post.objects.create(
-            text='тестовый постttt',
+            text=TEXT_TEST,
             author=self.user,
             group=self.group,
         )
@@ -225,7 +239,7 @@ class PostPagesTest(TestCase):
             author__following__user=self.user_follower)
         count_before_add_post = posts_before_add_post.count()
         Post.objects.create(
-            text='тестовый пост',
+            text=TEXT_TEST,
             author=self.user,
             group=self.group,
         )
@@ -239,7 +253,7 @@ class PostPagesTest(TestCase):
             author__following__user=self.user)
         count_before_add_post = posts_before_add_post.count()
         Post.objects.create(
-            text='тестовый пост',
+            text=TEXT_TEST,
             author=self.user_2,
             group=self.group,
         )
@@ -251,3 +265,25 @@ class PostPagesTest(TestCase):
     def test_unfollow_user(self):
         self.follow.delete()
         self.assertFalse(self.follow_filter.exists())
+
+    def test_comment_authorized_user(self):
+        form_data = {
+            'text': TEXT_COMMENT
+        }
+        response = self.authorised_client.post(
+            reverse('posts:add_comment',
+                    kwargs={'post_id': self.post.pk}),
+            data=form_data,
+            follow=True)
+        self.assertContains(response, TEXT_COMMENT)
+
+    def test_comment_unfollow_user(self):
+        form_data = {
+            'text': TEXT_COMMENT
+        }
+        response = self.guest_client.post(
+            reverse('posts:add_comment',
+                    kwargs={'post_id': self.post.pk}),
+            data=form_data,
+            follow=True)
+        self.assertNotContains(response, TEXT_COMMENT)

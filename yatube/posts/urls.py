@@ -30,11 +30,9 @@ urlpatterns = [
          name='follow_index'),
     path('profile/<str:username>/follow/',
          views.profile_follow,
-         name='profile_follow'
-         ),
+         name='profile_follow'),
     path('profile/<str:username>/unfollow/',
          views.profile_unfollow,
-         name='profile_unfollow'
-         ),
+         name='profile_unfollow'),
 
 ]
